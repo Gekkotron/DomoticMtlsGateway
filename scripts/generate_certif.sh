@@ -36,7 +36,7 @@ openssl req -new -x509 -key ca_key.pem -out ca_cert.pem -days $CERT_VALIDITY_DAY
   -subj "/C=$CERT_COUNTRY/ST=$CERT_STATE/L=$CERT_CITY/O=$CERT_ORG/OU=$CERT_UNIT/CN=$CA_COMMON_NAME"
 
 
-# 2. Create the Server Certificate
+# 2. Create the Server Certificate for DOMOTIC_HOST
 echo "🖥️  Creating server certificate for $SERVER_COMMON_NAME..."
 openssl genrsa -out server_key.pem 2048
 
@@ -65,6 +65,35 @@ fi
 
 rm server.csr
 
+# 2b. Create the Server Certificate for localhost
+echo "🏠 Creating server certificate for localhost..."
+openssl genrsa -out localhost_key.pem 2048
+
+openssl req -new -key localhost_key.pem -out localhost.csr \
+  -subj "/C=$CERT_COUNTRY/ST=$CERT_STATE/L=$CERT_CITY/O=$CERT_ORG/OU=$CERT_UNIT/CN=localhost" \
+  -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" 2>/dev/null || {
+    # Fallback for older OpenSSL versions without -addext support
+    openssl req -new -key localhost_key.pem -out localhost.csr \
+      -subj "/C=$CERT_COUNTRY/ST=$CERT_STATE/L=$CERT_CITY/O=$CERT_ORG/OU=$CERT_UNIT/CN=localhost"
+}
+
+# Try with copy_extensions first, fallback if not supported
+openssl x509 -req -in localhost.csr -CA ca_cert.pem -CAkey ca_key.pem \
+  -CAcreateserial -out localhost_cert.pem -days $CERT_VALIDITY_DAYS \
+  -copy_extensions copy 2>/dev/null || {
+    # Fallback for older OpenSSL versions
+    openssl x509 -req -in localhost.csr -CA ca_cert.pem -CAkey ca_key.pem \
+      -CAcreateserial -out localhost_cert.pem -days $CERT_VALIDITY_DAYS
+}
+
+# Verify localhost certificate was created
+if [ ! -f localhost_cert.pem ]; then
+    echo "❌ ERROR: Failed to generate localhost_cert.pem"
+    exit 1
+fi
+
+rm localhost.csr
+
 # 3. Create the Client Certificate
 echo "📱 Creating client certificate for $CLIENT_COMMON_NAME..."
 
@@ -84,4 +113,5 @@ echo "✅ Certificates generated successfully!"
 echo "📁 Generated files in $CERTS_DIR/:"
 echo "   - ca_cert.pem (Certificate Authority)"
 echo "   - server_cert.pem (Server certificate for $SERVER_COMMON_NAME)"
+echo "   - localhost_cert.pem (Server certificate for localhost)"
 echo "   - client_cert.pem (Client certificate for $CLIENT_COMMON_NAME)"
