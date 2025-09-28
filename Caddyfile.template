@@ -1,29 +1,10 @@
 {
-    # Disable automatic HTTPS and PKI management
     auto_https disable_redirects
-    #local_certs
-    #skip_install_trust
-
-    #log {
-    #    output file {{LOGS_DIR}}/access.log
-    #    format json
-    #    level DEBUG
-    #}
+    default_sni domotic.local
 }
 
-https://{{DOMOTIC_HOST}}:{{DOMOTIC_PORT}} {
+:{{DOMOTIC_PORT}} {
     tls {{CERTS_DIR}}/server_cert.pem {{CERTS_DIR}}/server_key.pem {
-        client_auth {
-            mode require_and_verify
-            trust_pool file {{CERTS_DIR}}/ca_cert.pem
-        }
-    }
-
-    reverse_proxy {{BACKEND_PROTOCOL}}://{{BACKEND_IP}}:{{BACKEND_PORT}}
-}
-
-https://localhost:{{DOMOTIC_PORT}} {
-    tls {{CERTS_DIR}}/localhost_cert.pem {{CERTS_DIR}}/localhost_key.pem {
         client_auth {
             mode require_and_verify
             trust_pool file {{CERTS_DIR}}/ca_cert.pem
