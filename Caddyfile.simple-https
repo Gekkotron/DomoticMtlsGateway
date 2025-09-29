@@ -1,17 +1,17 @@
 {
     auto_https disable_redirects
-    default_sni domotic.local
+    #default_sni domotic.local
 }
 
-https://:{{DOMOTIC_PORT}} {
-    tls {{CERTS_DIR}}/server_cert.pem {{CERTS_DIR}}/server_key.pem {
+https://:8443 {
+    tls certs/server_cert.pem certs/server_key.pem {
         client_auth {
             mode require_and_verify
-            trust_pool file {{CERTS_DIR}}/ca_cert.pem
+            trust_pool file certs/ca_cert.pem
         }
     }
 
-    reverse_proxy {{BACKEND_PROTOCOL}}://{{BACKEND_IP}}:{{BACKEND_PORT}} {
+    reverse_proxy http://192.168.1.90:80 {
         header_up Host {host}
         header_up X-Real-IP {remote_host}
         header_up X-Forwarded-For {remote_host}
@@ -24,9 +24,9 @@ https://:{{DOMOTIC_PORT}} {
 }
 
 
-#https://:{{DOMOTIC_PORT}} {
-#    tls {{CERTS_DIR}}/server_cert.pem {{CERTS_DIR}}/server_key.pem
-#    reverse_proxy {{BACKEND_PROTOCOL}}://{{BACKEND_IP}}:{{BACKEND_PORT}} {
+#https://:8443 {
+#    tls certs/server_cert.pem certs/server_key.pem
+#    reverse_proxy http://192.168.1.90:80 {
 #        header_up Host {host}
 #        header_up X-Real-IP {remote_host}
 #        header_up X-Forwarded-For {remote_host}

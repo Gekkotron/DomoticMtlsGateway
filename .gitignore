@@ -2,3 +2,6 @@ certs
 logs
 Caddyfile
 .env
+backups
+.DS_Store
+.sync_config

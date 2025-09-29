@@ -40,22 +40,42 @@ openssl req -new -x509 -key ca_key.pem -out ca_cert.pem -days $CERT_VALIDITY_DAY
 echo "🖥️  Creating server certificate for $SERVER_COMMON_NAME..."
 openssl genrsa -out server_key.pem 2048
 
-openssl req -new -key server_key.pem -out server.csr \
-  -subj "/C=$CERT_COUNTRY/ST=$CERT_STATE/L=$CERT_CITY/O=$CERT_ORG/OU=$CERT_UNIT/CN=$SERVER_COMMON_NAME" \
-  -addext "subjectAltName=DNS:$SERVER_COMMON_NAME,IP:127.0.0.1" 2>/dev/null || {
-    # Fallback for older OpenSSL versions without -addext support
-    openssl req -new -key server_key.pem -out server.csr \
-      -subj "/C=$CERT_COUNTRY/ST=$CERT_STATE/L=$CERT_CITY/O=$CERT_ORG/OU=$CERT_UNIT/CN=$SERVER_COMMON_NAME"
-}
+# Create a config file for SAN extensions
+cat > server.conf << EOF
+[req]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
 
-# Try with copy_extensions first, fallback if not supported
+[req_distinguished_name]
+C=$CERT_COUNTRY
+ST=$CERT_STATE
+L=$CERT_CITY
+O=$CERT_ORG
+OU=$CERT_UNIT
+CN=$SERVER_COMMON_NAME
+
+[v3_req]
+keyUsage = keyEncipherment, dataEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = $SERVER_COMMON_NAME
+DNS.2 = localhost
+DNS.3 = *.tail497f.ts.net
+IP.1 = 127.0.0.1
+IP.2 = ::1
+EOF
+
+openssl req -new -key server_key.pem -out server.csr -config server.conf
+
 openssl x509 -req -in server.csr -CA ca_cert.pem -CAkey ca_key.pem \
   -CAcreateserial -out server_cert.pem -days $CERT_VALIDITY_DAYS \
-  -copy_extensions copy 2>/dev/null || {
-    # Fallback for older OpenSSL versions
-    openssl x509 -req -in server.csr -CA ca_cert.pem -CAkey ca_key.pem \
-      -CAcreateserial -out server_cert.pem -days $CERT_VALIDITY_DAYS
-}
+  -extensions v3_req -extfile server.conf
+
+# Clean up temporary files
+rm server.conf
 
 # Verify server certificate was created
 if [ ! -f server_cert.pem ]; then
@@ -69,22 +89,41 @@ rm server.csr
 echo "🏠 Creating server certificate for localhost..."
 openssl genrsa -out localhost_key.pem 2048
 
-openssl req -new -key localhost_key.pem -out localhost.csr \
-  -subj "/C=$CERT_COUNTRY/ST=$CERT_STATE/L=$CERT_CITY/O=$CERT_ORG/OU=$CERT_UNIT/CN=localhost" \
-  -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" 2>/dev/null || {
-    # Fallback for older OpenSSL versions without -addext support
-    openssl req -new -key localhost_key.pem -out localhost.csr \
-      -subj "/C=$CERT_COUNTRY/ST=$CERT_STATE/L=$CERT_CITY/O=$CERT_ORG/OU=$CERT_UNIT/CN=localhost"
-}
+# Create a config file for localhost SAN extensions
+cat > localhost.conf << EOF
+[req]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
 
-# Try with copy_extensions first, fallback if not supported
+[req_distinguished_name]
+C=$CERT_COUNTRY
+ST=$CERT_STATE
+L=$CERT_CITY
+O=$CERT_ORG
+OU=$CERT_UNIT
+CN=localhost
+
+[v3_req]
+keyUsage = keyEncipherment, dataEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = localhost
+DNS.2 = *.local
+IP.1 = 127.0.0.1
+IP.2 = ::1
+EOF
+
+openssl req -new -key localhost_key.pem -out localhost.csr -config localhost.conf
+
 openssl x509 -req -in localhost.csr -CA ca_cert.pem -CAkey ca_key.pem \
   -CAcreateserial -out localhost_cert.pem -days $CERT_VALIDITY_DAYS \
-  -copy_extensions copy 2>/dev/null || {
-    # Fallback for older OpenSSL versions
-    openssl x509 -req -in localhost.csr -CA ca_cert.pem -CAkey ca_key.pem \
-      -CAcreateserial -out localhost_cert.pem -days $CERT_VALIDITY_DAYS
-}
+  -extensions v3_req -extfile localhost.conf
+
+# Clean up temporary files
+rm localhost.conf
 
 # Verify localhost certificate was created
 if [ ! -f localhost_cert.pem ]; then
@@ -99,13 +138,34 @@ echo "📱 Creating client certificate for $CLIENT_COMMON_NAME..."
 
 openssl genrsa -out client_key.pem 2048
 
-openssl req -new -key client_key.pem -out client.csr \
-  -subj "/C=$CERT_COUNTRY/ST=$CERT_STATE/L=$CERT_CITY/O=$CERT_ORG/OU=$CERT_UNIT/CN=$CLIENT_COMMON_NAME"
+# Create a config file for client certificate extensions
+cat > client.conf << EOF
+[req]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+C=$CERT_COUNTRY
+ST=$CERT_STATE
+L=$CERT_CITY
+O=$CERT_ORG
+OU=$CERT_UNIT
+CN=$CLIENT_COMMON_NAME
+
+[v3_req]
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = clientAuth
+EOF
+
+openssl req -new -key client_key.pem -out client.csr -config client.conf
 
 openssl x509 -req -in client.csr -CA ca_cert.pem -CAkey ca_key.pem \
-  -CAcreateserial -out client_cert.pem -days $CERT_VALIDITY_DAYS
+  -CAcreateserial -out client_cert.pem -days $CERT_VALIDITY_DAYS \
+  -extensions v3_req -extfile client.conf
 
-rm client.csr
+# Clean up temporary files
+rm client.conf client.csr
 
 cd "$PROJECT_ROOT"
 
